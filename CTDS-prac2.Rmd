@@ -1,0 +1,122 @@
+---
+title: Camera trap distance sampling workshop
+description: |
+  Practical 2: detection function fitting for the duiker data set
+author:
+  - name: Workshop development group 
+    url: http://workshops.distancesampling.org
+    affiliation: CREEM, Univ of St Andrews
+    affiliation_url: https://www.creem.st-andrews.ac.uk
+date: "`r Sys.Date()`"
+output: 
+  distill::distill_article:
+    toc: true
+    toc_depth: 2
+bibliography: howeetal18.bib
+csl: apa.csl
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(eval=TRUE, echo=TRUE, message=FALSE, warnings=FALSE)
+solution <- FALSE
+```
+
+# Analysis of camera trapping data using distance sampling
+
+A distance sampling approach to the analysis of camera trapping data offers the potential advantage that individual animal identification is not required. However, accurate animal-to-camera detection distances are required. This requires calibration prior to the survey with images of objects of known size taken at known distances from the camera. See details in @howeetal for description of the field work and data analysis. Here we present analysis of data from @howeetal using the R package `Distance` @miller.
+
+## Estimating temporal availability for detection
+
+Heat- and motion-sensitive camera traps detect only moving animals within the range of the sensor and the field of view of the camera. Animals are therefore unavailable for detection by camera traps when they are stationary, and when they are above (e.g., semi-arboreal species) or below (e.g., semi-fossorial species) the range of the sensor or the camera, regardless of their distance from the camera in two dimensions. This temporally limited availability for detection must be accounted for to avoid negative bias in estimated densities. When data are abundant, researchers may choose to include only data from times when 100% of the population can be assumed to be active within the vertical range of camera traps @howeetal. However, for rarely-detected species or surveys with lower effort, it might be necessary to include most or all observations of distance. In these situations, survey duration ($T_k$) might be 12- or 24-hours per day, and it becomes necessary to estimate the proportion of time included in $T_k$ when animals were available for detection. Methods for estimating this proportion directly from CT data have been described @rowcliffe_2014, and it can be included in analyses to estimate density @bessone_2020, for example as another multiplier, potentially with an associated standard errors.  This will be the subject of Practical 5.
+
+## Data input
+
+A data set for recording of detections during *peak activity* are included in the `Distance` package. Examine the `DuikerCameraTraps` described in the data repository @dryad.
+
+```{r, readin, message=FALSE}
+library(Distance)
+data("DuikerCameraTraps")
+```
+
+## Exploratory Data Analysis
+
+A quick summary of the data set including: How many camera stations and how many detections in total.
+
+```{r smaltable, eval=solution}
+sum(!is.na(DuikerCameraTraps$distance))
+table(DuikerCameraTraps$Sample.Label)
+```
+
+Note, three sampling stations (B1, C5, E4) had no detections. The one record for each of those stations has distance recorded as `NA`, but the record is important because it contains effort information.
+
+## Distance recording
+
+A quick examination of the distribution of detection distances; note the bespoke cutpoints causing distance bins to be narrow out to 8m, then increasing in width to the maximum detection distance of 21m.
+
+```{r, eval=solution}
+breakpoints <- c(seq(0,8,1), 10, 12, 15, 21)
+hist(DuikerCameraTraps$distance, breaks=breakpoints, main="Peak activity data set",
+     xlab="Radial distance (m)")
+```
+
+## Truncation decisions
+
+As described by @howeetal:
+
+> a paucity of observations between 1 and 2 m but not between 2 and 3 m, so we left-truncated at 2 m. Fitted detection functions and probability density functions were heavy-tailed when distances \>15 m were included, so we right truncated at 15 m.
+
+# Detection function fits
+
+
+Candidate models include the half normal key with 0 and 1 Hermite polynomial adjustment; uniform key with 1 and 2 cosine adjustments and the hazard rate key with 0, 1 and 2 cosine adjustments.  Note, rather than allow `ds` to perform within-key function model selection of adjustment terms, we explicitly fit each adjustment term model.  We need the model objects from all models for subsequent model selection.
+
+```{r fit, eval=solution}
+conversion <- convert_units("meter", NULL, "square kilometer")
+trunc.list <- list(left=2, right=15)
+mybreaks <- c(seq(2,8,1), 10, 12, 15)
+hn0 <- ds(DuikerCameraTraps, transect = "point", key="hn", adjustment = NULL,
+          cutpoints = mybreaks, truncation = trunc.list)
+hn1 <- ds(DuikerCameraTraps, transect = "point", key="hn", adjustment = "herm",
+          order=2,
+          cutpoints = mybreaks, truncation = trunc.list)
+
+uni1 <- ds(DuikerCameraTraps, transect = "point", key="unif", adjustment = "cos",
+           order=1,
+           cutpoints = mybreaks, truncation = trunc.list)
+uni2 <- ds(DuikerCameraTraps, transect = "point", key="unif", adjustment = "cos",
+           order=c(1,2),
+           cutpoints = mybreaks, truncation = trunc.list)
+
+hr0 <- ds(DuikerCameraTraps, transect = "point", key="hr", adjustment = NULL,
+          cutpoints = mybreaks, truncation = trunc.list)
+hr1 <- ds(DuikerCameraTraps, transect = "point", key="hr", adjustment = "cos",
+          order=2,
+          cutpoints = mybreaks, truncation = trunc.list)
+hr2 <- ds(DuikerCameraTraps, transect = "point", key="hr", adjustment = "cos",
+          order=c(2,3),
+          cutpoints = mybreaks, truncation = trunc.list)
+```
+
+# Preliminary model assessment
+
+Summary of goodness of fit and AIC scores among fitted models.
+
+```{r assessment, eval=solution}
+knitr::kable(summarize_ds_models(hn0,hn1,uni1,uni2,hr0,hr1,hr2),
+             caption="Summary of fitted models", row.names = FALSE,
+             digits = c(0,0,0,5,3,4,1))
+```
+
+# Questions
+- What might be justification for left truncation?
+  - What are the dangers of such truncation?
+- Initial assessment of fit of models?
+- Preliminary model choice?
+
+
+# Store intermediate results for further analysis in subsequent practicals
+
+```{r storeresults, eval=solution}
+fittedmodels <- c("hn0", "hn1", "uni1", "uni2", "hr0", "hr1", "hr2")
+save(list=fittedmodels, file="duikermodels.RData")
+```
