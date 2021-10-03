@@ -29,7 +29,7 @@ hn1 <- ds(DuikerCameraTraps, transect = "point", key="hn", adjustment = "herm",
           order=2,
           cutpoints = mybreaks, truncation = trunc.list)
 hn2 <- ds(DuikerCameraTraps, transect = "point", key="hn", adjustment = "herm",
-          order=c(4,6),
+          order=c(2,3),
           cutpoints = mybreaks, truncation = trunc.list)
 
 uni1 <- ds(DuikerCameraTraps, transect = "point", key="unif", adjustment = "cos",
